@@ -200,6 +200,7 @@ jobs:
             done
           done
           echo "DLL copy complete"
+          exit 0
 
       - name: Get version
         id: version
