@@ -26,7 +26,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             libpq-dev libxml2-dev libxkbcommon-dev libgl1-mesa-dev \
-            fuse libfuse2 patchelf file libcups2-dev
+            fuse libfuse2 patchelf file libcups2-dev imagemagick
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
@@ -45,6 +45,30 @@ jobs:
       - name: Install into AppDir
         run: cmake --install build
 
+      - name: Prepare AppImage assets
+        run: |
+          # Create desktop file (not installed by CMake in v2.0)
+          mkdir -p AppDir/usr/share/applications
+          cat > AppDir/usr/share/applications/pgmodeler.desktop << 'EOF'
+          [Desktop Entry]
+          Name=pgModeler
+          Comment=PostgreSQL Database Modeler
+          Exec=pgmodeler
+          Icon=pgmodeler
+          Terminal=false
+          Type=Application
+          Categories=Development;Database;
+          EOF
+
+          # Convert the Windows .ico to PNG for the AppImage icon
+          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+          convert apps/pgmodeler/res/pgmodeler.ico[0] \
+            AppDir/usr/share/icons/hicolor/256x256/apps/pgmodeler.png || \
+          # Fallback: create a simple placeholder icon
+          convert -size 256x256 xc:#336699 \
+            -fill white -gravity center -pointsize 48 -annotate 0 "pgM" \
+            AppDir/usr/share/icons/hicolor/256x256/apps/pgmodeler.png
+
       - name: Package AppImage
         run: |
           wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
@@ -53,14 +77,12 @@ jobs:
           export QMAKE=$(which qmake)
           export LD_LIBRARY_PATH=$Qt6_DIR/lib:$LD_LIBRARY_PATH
           export VERSION=$(grep -m1 'project(pgmodeler VERSION' CMakeLists.txt | grep -oP '[\d.]+')
-          DESKTOP=$(find AppDir -name "pgmodeler.desktop" | head -1)
-          ICON=$(find AppDir -name "pgmodeler.png" | head -1)
           ./linuxdeploy-x86_64.AppImage \
             --appdir AppDir \
             --plugin qt \
             --output appimage \
-            ${DESKTOP:+--desktop-file "$DESKTOP"} \
-            ${ICON:+--icon-file "$ICON"}
+            --desktop-file AppDir/usr/share/applications/pgmodeler.desktop \
+            --icon-file AppDir/usr/share/icons/hicolor/256x256/apps/pgmodeler.png
           mv pgmodeler-*.AppImage pgmodeler-$VERSION-linux-x86_64.AppImage 2>/dev/null || \
           mv *AppImage pgmodeler-$VERSION-linux-x86_64.AppImage
 
@@ -81,8 +103,9 @@ jobs:
       - name: Install PostgreSQL
         run: |
           brew install postgresql@17
-          echo "$(brew --prefix postgresql@17)/bin" >> $GITHUB_PATH
-          echo "PGSQL_ROOT=$(brew --prefix postgresql@17)" >> $GITHUB_ENV
+          PGSQL_ROOT=$(brew --prefix postgresql@17)
+          echo "PGSQL_INC=$PGSQL_ROOT/include" >> $GITHUB_ENV
+          echo "PGSQL_LIBS=$PGSQL_ROOT/lib/libpq.dylib" >> $GITHUB_ENV
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
@@ -91,12 +114,13 @@ jobs:
 
       - name: Configure
         run: |
+          XML_SDK=$(xcrun --show-sdk-path)
           cmake -S . -B build \
             -DCMAKE_BUILD_TYPE=Release \
-            -DPGSQL_INC=${{ env.PGSQL_ROOT }}/include \
-            -DPGSQL_LIBS=${{ env.PGSQL_ROOT }}/lib/libpq.dylib \
-            -DXML2_INC=$(xcrun --show-sdk-path)/usr/include/libxml2 \
-            -DXML2_LIBS=$(xcrun --show-sdk-path)/usr/lib/libxml2.tbd
+            -DPGSQL_INC="${{ env.PGSQL_INC }}" \
+            -DPGSQL_LIBS="${{ env.PGSQL_LIBS }}" \
+            -DXML2_INC="$XML_SDK/usr/include/libxml2" \
+            -DXML2_LIBS="$XML_SDK/usr/lib/libxml2.tbd"
 
       - name: Build
         run: cmake --build build --parallel $(sysctl -n hw.logicalcpu)
@@ -141,12 +165,18 @@ jobs:
             mingw-w64-x86_64-qt6-tools
 
       - name: Configure
+        env:
+          CC: gcc
+          CXX: g++
         run: |
           cmake -S . -B build -G "MinGW Makefiles" \
             -DCMAKE_BUILD_TYPE=Release \
             -DPGM_PREFIX=$(cygpath -m $GITHUB_WORKSPACE/install)
 
       - name: Build
+        env:
+          CC: gcc
+          CXX: g++
         run: cmake --build build --parallel $(nproc)
 
       - name: Install
