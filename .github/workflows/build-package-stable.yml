@@ -159,7 +159,7 @@ jobs:
       - name: Build
         run: |
           cd $GITHUB_WORKSPACE
-          qmake-qt6 pgmodeler.pro -spec win32-clang-g++ -r \
+          qmake pgmodeler.pro -spec win32-clang-g++ -r \
             PREFIX=D:/a/pgmodeler/pgmodeler/install \
             XML_INC=$(cygpath -m /mingw64/include/libxml2) \
             XML_LIB=$(cygpath -m /mingw64/bin/libxml2-2.dll) \
