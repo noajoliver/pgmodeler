@@ -105,12 +105,11 @@ jobs:
 
       - name: Patch DefaultPaths.cmake for brew PostgreSQL
         run: |
-          # Use shell var $PGSQL_ROOT (set via $GITHUB_ENV in previous step)
-          # Note: ${{ env.PGSQL_ROOT }} would NOT work here as it's evaluated before the step runs
-          sed -i.bak "s|/Library/PostgreSQL/17/include|${PGSQL_ROOT}/include|g" DefaultPaths.cmake
+          # brew installs headers in include/postgresql/ subdirectory
+          sed -i.bak "s|/Library/PostgreSQL/17/include|${PGSQL_ROOT}/include/postgresql|g" DefaultPaths.cmake
           sed -i.bak "s|/Library/PostgreSQL/17/lib/libpq.dylib|${PGSQL_ROOT}/lib/libpq.dylib|g" DefaultPaths.cmake
           echo "Patched paths:"
-          grep -E "(PGSQL_INC|PGSQL_LIBS)" DefaultPaths.cmake | grep -v "NOT DEFINED"
+          grep -E "(PGSQL_INC|PGSQL_LIBS)" DefaultPaths.cmake
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
@@ -119,10 +118,6 @@ jobs:
 
       - name: Configure
         run: |
-          # Debug: check where libpq-fe.h actually lives
-          echo "=== PostgreSQL include contents ==="
-          ls $PGSQL_ROOT/include/ | head -20
-          find $PGSQL_ROOT/include -name "libpq-fe.h" 2>/dev/null
           XML_SDK=$(xcrun --show-sdk-path)
           cmake -S . -B build \
             -DCMAKE_BUILD_TYPE=Release \
