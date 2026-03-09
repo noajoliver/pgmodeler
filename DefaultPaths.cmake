@@ -20,19 +20,11 @@ add_compile_definitions(
     SCHEMASDIR="${PGM_SCHEMASDIR}")
 
 if(APPLE)
-	# Allow overriding paths via -D flags (e.g. for CI with brew-installed PostgreSQL)
-	if(NOT DEFINED PGSQL_INC)
-		set(PGSQL_INC /Library/PostgreSQL/17/include)
-	endif()
-	if(NOT DEFINED PGSQL_LIBS)
-		set(PGSQL_LIBS /Library/PostgreSQL/17/lib/libpq.dylib)
-	endif()
-	if(NOT DEFINED XML2_INC)
-		set(XML2_INC /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/libxml2)
-	endif()
-	if(NOT DEFINED XML2_LIBS)
-		set(XML2_LIBS /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib/libxml2.tbd)
-	endif()
+	set(PGSQL_INC /Library/PostgreSQL/17/include)
+	set(PGSQL_LIBS /Library/PostgreSQL/17/lib/libpq.dylib)
+
+	set(XML2_INC /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/libxml2)
+	set(XML2_LIBS /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib/libxml2.tbd)
 else()
 	# Searching for PostgreSQL headers/libraries
 	# This command attempts to find the library, REQUIRED argument is optional
