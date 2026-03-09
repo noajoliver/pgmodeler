@@ -159,12 +159,18 @@ jobs:
       - name: Build
         run: |
           cd $GITHUB_WORKSPACE
+          # Use 'which' to get the actual runtime path (msys2 may not be at C:/msys64)
+          XML_LIB=$(cygpath -m $(find /mingw64/bin -name "libxml2*.dll" | head -1))
+          PGSQL_LIB=$(cygpath -m $(find /mingw64/bin -name "libpq.dll" | head -1))
+          XML_INC=$(cygpath -m /mingw64/include/libxml2)
+          PGSQL_INC=$(cygpath -m /mingw64/include)
+          echo "XML_LIB=$XML_LIB PGSQL_LIB=$PGSQL_LIB"
           qmake pgmodeler.pro -spec win32-clang-g++ -r \
             PREFIX=D:/a/pgmodeler/pgmodeler/install \
-            XML_INC=$(cygpath -m /mingw64/include/libxml2) \
-            XML_LIB=$(cygpath -m /mingw64/bin/libxml2-2.dll) \
-            PGSQL_INC=$(cygpath -m /mingw64/include) \
-            PGSQL_LIB=$(cygpath -m /mingw64/bin/libpq.dll) \
+            XML_INC="$XML_INC" \
+            XML_LIB="$XML_LIB" \
+            PGSQL_INC="$PGSQL_INC" \
+            PGSQL_LIB="$PGSQL_LIB" \
             CONFIG+=release
           mingw32-make -j$(nproc)
           mingw32-make install
