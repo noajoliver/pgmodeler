@@ -101,9 +101,14 @@ jobs:
       - name: Install PostgreSQL
         run: |
           brew install postgresql@17
-          PGSQL_ROOT=$(brew --prefix postgresql@17)
-          echo "PGSQL_INC=$PGSQL_ROOT/include" >> $GITHUB_ENV
-          echo "PGSQL_LIBS=$PGSQL_ROOT/lib/libpq.dylib" >> $GITHUB_ENV
+          echo "PGSQL_ROOT=$(brew --prefix postgresql@17)" >> $GITHUB_ENV
+
+      - name: Patch DefaultPaths.cmake for brew PostgreSQL
+        run: |
+          # Replace hardcoded EnterpriseDB paths with brew paths
+          PGSQL_ROOT=${{ env.PGSQL_ROOT }}
+          sed -i.bak "s|/Library/PostgreSQL/17/include|$PGSQL_ROOT/include|g" DefaultPaths.cmake
+          sed -i.bak "s|/Library/PostgreSQL/17/lib/libpq.dylib|$PGSQL_ROOT/lib/libpq.dylib|g" DefaultPaths.cmake
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
@@ -115,8 +120,6 @@ jobs:
           XML_SDK=$(xcrun --show-sdk-path)
           cmake -S . -B build \
             -DCMAKE_BUILD_TYPE=Release \
-            -DPGSQL_INC="${{ env.PGSQL_INC }}" \
-            -DPGSQL_LIBS="${{ env.PGSQL_LIBS }}" \
             -DXML2_INC="$XML_SDK/usr/include/libxml2" \
             -DXML2_LIBS="$XML_SDK/usr/lib/libxml2.tbd"
 
@@ -166,8 +169,8 @@ jobs:
         run: |
           cmake -S . -B build -G "MinGW Makefiles" \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_C_COMPILER=C:/msys64/mingw64/bin/gcc.exe \
-            -DCMAKE_CXX_COMPILER=C:/msys64/mingw64/bin/g++.exe \
+            -DCMAKE_C_COMPILER=/mingw64/bin/gcc \
+            -DCMAKE_CXX_COMPILER=/mingw64/bin/g++ \
             -DPGM_PREFIX=$(cygpath -m $GITHUB_WORKSPACE/install)
 
       - name: Build
