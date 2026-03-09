@@ -58,10 +58,10 @@ jobs:
           EOF
 
           mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
-          convert apps/pgmodeler/res/pgmodeler.ico[0] \
-            AppDir/usr/share/icons/hicolor/256x256/apps/pgmodeler.png || \
-          convert -size 256x256 xc:#336699 \
-            -fill white -gravity center -pointsize 48 -annotate 0 "pgM" \
+          # v1.x uses windows_ico.ico; fall back to the bundled logo PNG
+          convert apps/pgmodeler/res/windows_ico.ico[0] \
+            AppDir/usr/share/icons/hicolor/256x256/apps/pgmodeler.png 2>/dev/null || \
+          cp assets/conf/pgmodeler_logo.png \
             AppDir/usr/share/icons/hicolor/256x256/apps/pgmodeler.png
 
       - name: Package AppImage
