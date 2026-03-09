@@ -209,10 +209,26 @@ jobs:
       - name: Copy MinGW runtime DLLs
         run: |
           INSTALL=$GITHUB_WORKSPACE/install
-          for dll in libgcc_s_seh-1.dll libstdc++-6.dll libwinpthread-1.dll \
-                     libpq.dll libssl-3-x64.dll libcrypto-3-x64.dll \
-                     libxml2-2.dll libzstd.dll zlib1.dll; do
-            cp /mingw64/bin/$dll "$INSTALL/" 2>/dev/null || true
+          MINGW_BIN=/mingw64/bin
+          # Use ldd to find all mingw64 dependencies dynamically (handles version changes)
+          find "$INSTALL" -name "*.exe" -o -name "*.dll" | while read bin; do
+            ldd "$bin" 2>/dev/null | grep "$MINGW_BIN" | awk '{print $3}'
+          done | sort -u | while read dll; do
+            base=$(basename "$dll")
+            if [ ! -f "$INSTALL/$base" ]; then
+              echo "Copying $base"
+              cp "$dll" "$INSTALL/" 2>/dev/null || true
+            fi
+          done
+          # Second pass for transitive deps
+          find "$INSTALL" -name "*.dll" | while read bin; do
+            ldd "$bin" 2>/dev/null | grep "$MINGW_BIN" | awk '{print $3}'
+          done | sort -u | while read dll; do
+            base=$(basename "$dll")
+            if [ ! -f "$INSTALL/$base" ]; then
+              echo "Copying transitive: $base"
+              cp "$dll" "$INSTALL/" 2>/dev/null || true
+            fi
           done
 
       - name: Get version
