@@ -186,21 +186,23 @@ jobs:
         run: |
           INSTALL=D:/a/pgmodeler/pgmodeler/install
           MINGW_BIN=/mingw64/bin
-          # Collect all mingw64 deps via ldd, copy missing ones (two passes for transitive deps)
+          # Collect all deps to a temp file to avoid subshell exit code issues
+          TMPFILE=$(mktemp)
           for pass in 1 2; do
-            find "$INSTALL" \( -name "*.exe" -o -name "*.dll" \) | while read bin; do
-              ldd "$bin" 2>/dev/null | grep "$MINGW_BIN" | awk '{print $3}'
-            done | sort -u | while read dll; do
+            find "$INSTALL" \( -name "*.exe" -o -name "*.dll" \) -print0 | \
+              xargs -0 -I{} ldd "{}" 2>/dev/null | \
+              grep "$MINGW_BIN" | awk '{print $3}' | sort -u > "$TMPFILE" || true
+            while IFS= read -r dll; do
               [ -z "$dll" ] && continue
               base=$(basename "$dll")
               if [ ! -f "$INSTALL/$base" ]; then
                 echo "Copying $base"
-                cp "$dll" "$INSTALL/" || true
+                cp "$dll" "$INSTALL/" 2>/dev/null || true
               fi
-            done
+            done < "$TMPFILE"
           done
+          rm -f "$TMPFILE"
           echo "DLL copy complete"
-          exit 0
 
       - name: Get version
         id: version
