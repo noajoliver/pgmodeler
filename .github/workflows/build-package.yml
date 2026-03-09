@@ -105,8 +105,12 @@ jobs:
           # Use pg_config for authoritative paths
           PGSQL_INC=$(pg_config --includedir 2>/dev/null || echo "$PGSQL_ROOT/include/postgresql")
           PGSQL_LIB=$(pg_config --libdir 2>/dev/null || echo "$PGSQL_ROOT/lib")
-          # Find the actual libpq dylib
-          PGSQL_DYLIB=$(find "$PGSQL_LIB" -name "libpq*.dylib" | sort | tail -1)
+          # Find libpq.dylib specifically (not libpqwalreceiver or other plugins)
+          PGSQL_DYLIB=$(find "$PGSQL_LIB" -maxdepth 1 -name "libpq.dylib" | head -1)
+          # Fallback: find versioned libpq if unversioned not present
+          if [ -z "$PGSQL_DYLIB" ]; then
+            PGSQL_DYLIB=$(find "$PGSQL_LIB" -maxdepth 1 -name "libpq.*.dylib" | sort | tail -1)
+          fi
           echo "PGSQL_INC=$PGSQL_INC" >> $GITHUB_ENV
           echo "PGSQL_DYLIB=$PGSQL_DYLIB" >> $GITHUB_ENV
           echo "PG inc: $PGSQL_INC, lib: $PGSQL_DYLIB"
