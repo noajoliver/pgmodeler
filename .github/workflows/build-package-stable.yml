@@ -59,9 +59,12 @@ jobs:
 
           mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
           # v1.x uses windows_ico.ico; fall back to the bundled logo PNG
+          # Must be exactly 256x256 — linuxdeploy rejects non-standard resolutions
           convert apps/pgmodeler/res/windows_ico.ico[0] \
+            -resize 256x256! \
             AppDir/usr/share/icons/hicolor/256x256/apps/pgmodeler.png 2>/dev/null || \
-          cp assets/conf/pgmodeler_logo.png \
+          convert assets/conf/pgmodeler_logo.png \
+            -resize 256x256! \
             AppDir/usr/share/icons/hicolor/256x256/apps/pgmodeler.png
 
       - name: Package AppImage
@@ -202,6 +205,9 @@ jobs:
         run: |
           $version = "${{ steps.version.outputs.VERSION }}"
           $installDir = "D:\a\pgmodeler\pgmodeler\install"
+          $makensis = (Get-ChildItem "C:\Program Files (x86)\NSIS\makensis.exe","C:\Program Files\NSIS\makensis.exe" -ErrorAction SilentlyContinue | Select-Object -First 1).FullName
+          if (-not $makensis) { $makensis = (Get-Command makensis -ErrorAction SilentlyContinue).Source }
+          Write-Host "Using makensis: $makensis"
           $nsis = @"
           Unicode True
           !define APPNAME "pgModeler"
@@ -233,7 +239,7 @@ jobs:
           SectionEnd
           "@
           $nsis | Out-File -FilePath installer.nsi -Encoding UTF8
-          & "C:\Program Files (x86)\NSIS\makensis.exe" installer.nsi
+          & $makensis installer.nsi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
