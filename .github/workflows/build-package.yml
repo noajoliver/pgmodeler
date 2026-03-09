@@ -102,20 +102,23 @@ jobs:
         run: |
           brew install postgresql@17
           PGSQL_ROOT=$(brew --prefix postgresql@17)
-          # Use pg_config for authoritative paths
-          PGSQL_INC=$(pg_config --includedir 2>/dev/null || echo "$PGSQL_ROOT/include/postgresql")
-          PGSQL_LIB=$(pg_config --libdir 2>/dev/null || echo "$PGSQL_ROOT/lib")
-          # Find libpq.dylib specifically (not libpqwalreceiver or other plugins)
-          PGSQL_DYLIB=$(find "$PGSQL_LIB" -maxdepth 1 -name "libpq.dylib" | head -1)
-          # Fallback: find versioned libpq if unversioned not present
+          # Put pg_config on PATH immediately so we can use it
+          export PATH="$PGSQL_ROOT/bin:$PATH"
+          echo "$PGSQL_ROOT/bin" >> $GITHUB_PATH
+          PGSQL_INC=$(pg_config --includedir)
+          PGSQL_LIBDIR=$(pg_config --libdir)
+          # Debug: show all dylibs available
+          echo "All dylibs in libdir ($PGSQL_LIBDIR):"
+          find "$PGSQL_LIBDIR" -maxdepth 2 -name "*.dylib" | head -20
+          # Find libpq dylib (exact name first, then versioned, excluding plugins)
+          PGSQL_DYLIB=$(find "$PGSQL_LIBDIR" -maxdepth 2 -name "libpq.dylib" | head -1)
           if [ -z "$PGSQL_DYLIB" ]; then
-            PGSQL_DYLIB=$(find "$PGSQL_LIB" -maxdepth 1 -name "libpq.*.dylib" | sort | tail -1)
+            PGSQL_DYLIB=$(find "$PGSQL_LIBDIR" -maxdepth 2 -name "libpq.*.dylib" | grep -v walreceiver | sort | tail -1)
           fi
           echo "PGSQL_INC=$PGSQL_INC" >> $GITHUB_ENV
           echo "PGSQL_DYLIB=$PGSQL_DYLIB" >> $GITHUB_ENV
-          echo "PG inc: $PGSQL_INC, lib: $PGSQL_DYLIB"
-          # Add pg_config to PATH for subsequent steps
-          echo "$PGSQL_ROOT/bin" >> $GITHUB_PATH
+          echo "PG inc: $PGSQL_INC"
+          echo "PG dylib: $PGSQL_DYLIB"
 
       - name: Patch DefaultPaths.cmake for brew PostgreSQL
         run: |
