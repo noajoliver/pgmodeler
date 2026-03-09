@@ -47,7 +47,6 @@ jobs:
 
       - name: Prepare AppImage assets
         run: |
-          # Create desktop file (not installed by CMake in v2.0)
           mkdir -p AppDir/usr/share/applications
           cat > AppDir/usr/share/applications/pgmodeler.desktop << 'EOF'
           [Desktop Entry]
@@ -60,11 +59,9 @@ jobs:
           Categories=Development;Database;
           EOF
 
-          # Convert the Windows .ico to PNG for the AppImage icon
           mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
           convert apps/pgmodeler/res/pgmodeler.ico[0] \
             AppDir/usr/share/icons/hicolor/256x256/apps/pgmodeler.png || \
-          # Fallback: create a simple placeholder icon
           convert -size 256x256 xc:#336699 \
             -fill white -gravity center -pointsize 48 -annotate 0 "pgM" \
             AppDir/usr/share/icons/hicolor/256x256/apps/pgmodeler.png
@@ -83,8 +80,9 @@ jobs:
             --output appimage \
             --desktop-file AppDir/usr/share/applications/pgmodeler.desktop \
             --icon-file AppDir/usr/share/icons/hicolor/256x256/apps/pgmodeler.png
-          mv pgmodeler-*.AppImage pgmodeler-$VERSION-linux-x86_64.AppImage 2>/dev/null || \
-          mv *AppImage pgmodeler-$VERSION-linux-x86_64.AppImage
+          # Rename whatever AppImage was created (case-insensitive match)
+          find . -maxdepth 1 -iname "*.AppImage" ! -name "linuxdeploy*" \
+            -exec mv {} pgmodeler-$VERSION-linux-x86_64.AppImage \;
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -165,18 +163,14 @@ jobs:
             mingw-w64-x86_64-qt6-tools
 
       - name: Configure
-        env:
-          CC: gcc
-          CXX: g++
         run: |
           cmake -S . -B build -G "MinGW Makefiles" \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=C:/msys64/mingw64/bin/gcc.exe \
+            -DCMAKE_CXX_COMPILER=C:/msys64/mingw64/bin/g++.exe \
             -DPGM_PREFIX=$(cygpath -m $GITHUB_WORKSPACE/install)
 
       - name: Build
-        env:
-          CC: gcc
-          CXX: g++
         run: cmake --build build --parallel $(nproc)
 
       - name: Install
