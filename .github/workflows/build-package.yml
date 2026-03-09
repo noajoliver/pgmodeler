@@ -32,7 +32,6 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           version: ${{ inputs.qt_version }}
-          modules: 'qtsvg'
 
       - name: Configure
         run: |
@@ -54,13 +53,17 @@ jobs:
           export QMAKE=$(which qmake)
           export LD_LIBRARY_PATH=$Qt6_DIR/lib:$LD_LIBRARY_PATH
           export VERSION=$(grep -m1 'project(pgmodeler VERSION' CMakeLists.txt | grep -oP '[\d.]+')
+          # Find desktop file and icon
+          DESKTOP=$(find AppDir -name "pgmodeler.desktop" | head -1)
+          ICON=$(find AppDir -name "pgmodeler.png" | head -1)
           ./linuxdeploy-x86_64.AppImage \
             --appdir AppDir \
             --plugin qt \
             --output appimage \
-            --desktop-file AppDir/usr/share/applications/pgmodeler.desktop \
-            --icon-file AppDir/usr/share/pixmaps/pgmodeler.png
-          mv pgmodeler-*.AppImage pgmodeler-$VERSION-linux-x86_64.AppImage
+            ${DESKTOP:+--desktop-file "$DESKTOP"} \
+            ${ICON:+--icon-file "$ICON"}
+          mv pgmodeler-*.AppImage pgmodeler-$VERSION-linux-x86_64.AppImage 2>/dev/null || \
+          mv *AppImage pgmodeler-$VERSION-linux-x86_64.AppImage
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -85,7 +88,6 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           version: ${{ inputs.qt_version }}
-          modules: 'qtsvg'
 
       - name: Configure
         run: |
@@ -127,8 +129,8 @@ jobs:
           update: true
           install: >-
             base-devel
+            mingw-w64-x86_64-gcc
             mingw-w64-x86_64-make
-            mingw-w64-x86_64-clang
             mingw-w64-x86_64-cmake
             mingw-w64-x86_64-postgresql
             mingw-w64-x86_64-qt6
@@ -138,6 +140,8 @@ jobs:
         run: |
           cmake -S . -B build -G "MinGW Makefiles" \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=gcc \
+            -DCMAKE_CXX_COMPILER=g++ \
             -DPGM_PREFIX=$(cygpath -m $GITHUB_WORKSPACE/install)
 
       - name: Build
@@ -148,12 +152,14 @@ jobs:
 
       - name: Bundle Qt DLLs
         run: |
-          windeployqt6 --release \
-            $(cygpath -m $GITHUB_WORKSPACE/install)/pgmodeler.exe
+          INSTALL=$(cygpath -m $GITHUB_WORKSPACE/install)
+          # Find the main executable
+          EXE=$(find "$INSTALL" -name "pgmodeler.exe" | head -1)
+          windeployqt6 --release "$EXE"
 
       - name: Copy MinGW runtime DLLs
         run: |
-          INSTALL=$(cygpath -m $GITHUB_WORKSPACE/install)
+          INSTALL=$GITHUB_WORKSPACE/install
           for dll in libgcc_s_seh-1.dll libstdc++-6.dll libwinpthread-1.dll \
                      libpq.dll libssl-3-x64.dll libcrypto-3-x64.dll \
                      libxml2-2.dll libzstd.dll zlib1.dll; do
