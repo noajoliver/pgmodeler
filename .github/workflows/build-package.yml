@@ -1,4 +1,4 @@
-name: Build & Package pgModeler
+name: Build & Package pgModeler (v2.x)
 
 on:
   workflow_dispatch:
@@ -278,7 +278,7 @@ jobs:
     steps:
       - name: Report
         run: |
-          echo "## pgModeler Build Results" >> $GITHUB_STEP_SUMMARY
+          echo "## pgModeler v2.x Build Results" >> $GITHUB_STEP_SUMMARY
           echo "| Platform | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Linux (AppImage) | ${{ needs.build-linux.result }} |" >> $GITHUB_STEP_SUMMARY
