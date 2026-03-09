@@ -32,7 +32,6 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           version: ${{ inputs.qt_version }}
-          modules: 'qtsvg'
 
       - name: Configure
         run: |
@@ -89,7 +88,6 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           version: ${{ inputs.qt_version }}
-          modules: 'qtsvg'
 
       - name: Configure
         run: |
@@ -144,11 +142,8 @@ jobs:
 
       - name: Configure
         run: |
-          GCC_PATH=$(which g++)
           cmake -S . -B build -G "MinGW Makefiles" \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_C_COMPILER=$(which gcc) \
-            -DCMAKE_CXX_COMPILER=$GCC_PATH \
             -DPGM_PREFIX=$(cygpath -m $GITHUB_WORKSPACE/install)
 
       - name: Build
