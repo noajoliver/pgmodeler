@@ -1,0 +1,253 @@
+name: Build & Package pgModeler (Stable)
+
+on:
+  workflow_dispatch:
+    inputs:
+      qt_version:
+        description: 'Qt version to build with'
+        required: true
+        default: '6.8.0'
+        type: choice
+        options:
+          - '6.8.0'
+          - '6.7.3'
+          - '6.6.3'
+
+jobs:
+  # ─── Linux → AppImage ────────────────────────────────────────────────────────
+  build-linux:
+    name: Linux (AppImage)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: '1.2.3'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libpq-dev libxml2-dev libxkbcommon-dev libgl1-mesa-dev \
+            fuse libfuse2 patchelf file libcups2-dev imagemagick
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ inputs.qt_version }}
+
+      - name: Build
+        run: |
+          qmake pgmodeler.pro -r \
+            PREFIX=${{ github.workspace }}/AppDir/usr \
+            CONFIG+=release
+          make -j$(nproc)
+          make install
+
+      - name: Prepare AppImage assets
+        run: |
+          mkdir -p AppDir/usr/share/applications
+          cat > AppDir/usr/share/applications/pgmodeler.desktop << 'EOF'
+          [Desktop Entry]
+          Name=pgModeler
+          Comment=PostgreSQL Database Modeler
+          Exec=pgmodeler
+          Icon=pgmodeler
+          Terminal=false
+          Type=Application
+          Categories=Development;Database;
+          EOF
+
+          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+          convert apps/pgmodeler/res/pgmodeler.ico[0] \
+            AppDir/usr/share/icons/hicolor/256x256/apps/pgmodeler.png || \
+          convert -size 256x256 xc:#336699 \
+            -fill white -gravity center -pointsize 48 -annotate 0 "pgM" \
+            AppDir/usr/share/icons/hicolor/256x256/apps/pgmodeler.png
+
+      - name: Package AppImage
+        run: |
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          chmod +x linuxdeploy*.AppImage
+          export QMAKE=$(which qmake)
+          export LD_LIBRARY_PATH=$Qt6_DIR/lib:$LD_LIBRARY_PATH
+          VERSION=$(grep -m1 'VERSION' pgmodeler.pro | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          ./linuxdeploy-x86_64.AppImage \
+            --appdir AppDir \
+            --plugin qt \
+            --output appimage \
+            --desktop-file AppDir/usr/share/applications/pgmodeler.desktop \
+            --icon-file AppDir/usr/share/icons/hicolor/256x256/apps/pgmodeler.png
+          find . -maxdepth 1 -iname "*.AppImage" ! -name "linuxdeploy*" \
+            -exec mv {} pgmodeler-$VERSION-linux-x86_64.AppImage \;
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pgmodeler-stable-linux-appimage
+          path: pgmodeler-*-linux-x86_64.AppImage
+          retention-days: 30
+
+  # ─── macOS → DMG ─────────────────────────────────────────────────────────────
+  build-macos:
+    name: macOS (DMG)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: '1.2.3'
+
+      - name: Install PostgreSQL
+        run: |
+          brew install postgresql@17
+          PGSQL_ROOT=$(brew --prefix postgresql@17)
+          export PATH="$PGSQL_ROOT/bin:$PATH"
+          echo "$PGSQL_ROOT/bin" >> $GITHUB_PATH
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ inputs.qt_version }}
+
+      - name: Build
+        run: |
+          qmake pgmodeler.pro -r \
+            PREFIX=/Applications/pgModeler.app/Contents \
+            PGSQL_INC=$(pg_config --includedir) \
+            PGSQL_LIB=$(pg_config --libdir)/libpq.dylib \
+            CONFIG+=release
+          make -j$(sysctl -n hw.logicalcpu)
+          make install
+
+      - name: Package DMG
+        run: |
+          VERSION=$(grep -m1 'VERSION' pgmodeler.pro | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          macdeployqt /Applications/pgModeler.app -dmg -verbose=1
+          mv /Applications/pgModeler.dmg pgmodeler-$VERSION-macos.dmg
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pgmodeler-stable-macos-dmg
+          path: pgmodeler-*-macos.dmg
+          retention-days: 30
+
+  # ─── Windows → NSIS Installer ────────────────────────────────────────────────
+  build-windows:
+    name: Windows (NSIS Installer)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: '1.2.3'
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            base-devel
+            mingw-w64-x86_64-make
+            mingw-w64-x86_64-clang
+            mingw-w64-x86_64-postgresql
+            mingw-w64-x86_64-qt6
+            mingw-w64-x86_64-qt6-tools
+
+      - name: Build
+        run: |
+          cd $GITHUB_WORKSPACE
+          qmake-qt6 pgmodeler.pro -spec win32-clang-g++ -r \
+            PREFIX=D:/a/pgmodeler/pgmodeler/install \
+            XML_INC=$(cygpath -m /mingw64/include/libxml2) \
+            XML_LIB=$(cygpath -m /mingw64/bin/libxml2-2.dll) \
+            PGSQL_INC=$(cygpath -m /mingw64/include) \
+            PGSQL_LIB=$(cygpath -m /mingw64/bin/libpq.dll) \
+            CONFIG+=release
+          mingw32-make -j$(nproc)
+          mingw32-make install
+
+      - name: Bundle Qt DLLs
+        run: |
+          windeployqt6 --release D:/a/pgmodeler/pgmodeler/install/pgmodeler.exe
+
+      - name: Copy MinGW runtime DLLs
+        run: |
+          INSTALL=D:/a/pgmodeler/pgmodeler/install
+          for dll in libgcc_s_seh-1.dll libstdc++-6.dll libwinpthread-1.dll \
+                     libpq.dll libssl-3-x64.dll libcrypto-3-x64.dll \
+                     libxml2-2.dll libzstd.dll zlib1.dll; do
+            cp /mingw64/bin/$dll "$INSTALL/" 2>/dev/null || true
+          done
+
+      - name: Get version
+        id: version
+        shell: bash
+        run: echo "VERSION=$(grep -m1 'VERSION' pgmodeler.pro | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)" >> $GITHUB_OUTPUT
+
+      - name: Install NSIS
+        shell: pwsh
+        run: choco install nsis -y --no-progress
+
+      - name: Build NSIS installer
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.VERSION }}"
+          $installDir = "D:\a\pgmodeler\pgmodeler\install"
+          $nsis = @"
+          Unicode True
+          !define APPNAME "pgModeler"
+          !define VERSION "$version"
+
+          Name "`${APPNAME} `${VERSION}"
+          OutFile "pgmodeler-$version-windows-x86_64-installer.exe"
+          InstallDir "`$PROGRAMFILES64\pgModeler"
+          InstallDirRegKey HKLM "Software\pgModeler" "InstallDir"
+          RequestExecutionLevel admin
+
+          Section "pgModeler"
+            SetOutPath "`$INSTDIR"
+            File /r "$installDir\*"
+            CreateShortcut "`$DESKTOP\pgModeler.lnk" "`$INSTDIR\pgmodeler.exe"
+            CreateDirectory "`$SMPROGRAMS\pgModeler"
+            CreateShortcut "`$SMPROGRAMS\pgModeler\pgModeler.lnk" "`$INSTDIR\pgmodeler.exe"
+            CreateShortcut "`$SMPROGRAMS\pgModeler\Uninstall.lnk" "`$INSTDIR\Uninstall.exe"
+            WriteUninstaller "`$INSTDIR\Uninstall.exe"
+            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\pgModeler" "DisplayName" "pgModeler $version"
+            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\pgModeler" "UninstallString" "`$INSTDIR\Uninstall.exe"
+          SectionEnd
+
+          Section "Uninstall"
+            Delete "`$DESKTOP\pgModeler.lnk"
+            RMDir /r "`$SMPROGRAMS\pgModeler"
+            RMDir /r "`$INSTDIR"
+            DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\pgModeler"
+          SectionEnd
+          "@
+          $nsis | Out-File -FilePath installer.nsi -Encoding UTF8
+          & "C:\Program Files (x86)\NSIS\makensis.exe" installer.nsi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pgmodeler-stable-windows-installer
+          path: pgmodeler-*-windows-x86_64-installer.exe
+          retention-days: 30
+
+  # ─── Summary ─────────────────────────────────────────────────────────────────
+  summary:
+    name: Build Summary
+    needs: [build-linux, build-macos, build-windows]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Report
+        run: |
+          echo "## pgModeler Stable (v1.2.3) Build Results" >> $GITHUB_STEP_SUMMARY
+          echo "| Platform | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Linux (AppImage) | ${{ needs.build-linux.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| macOS (DMG) | ${{ needs.build-macos.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Windows (NSIS) | ${{ needs.build-windows.result }} |" >> $GITHUB_STEP_SUMMARY
