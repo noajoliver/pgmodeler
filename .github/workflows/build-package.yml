@@ -66,6 +66,29 @@ jobs:
             -fill white -gravity center -pointsize 48 -annotate 0 "pgM" \
             AppDir/usr/share/icons/hicolor/256x256/apps/pgmodeler.png
 
+      - name: Create AppRun wrapper
+        run: |
+          # pgModeler v2 uses $APPDIR to find resources, but it expects them at
+          # $APPDIR/schemas, $APPDIR/conf etc. — not $APPDIR/usr/schemas.
+          # This AppRun script sets the env vars to the correct bundled paths.
+          cat > AppDir/AppRun << 'EOF'
+          #!/bin/bash
+          HERE="$(dirname "$(readlink -f "$0")")"
+          export PGMODELER_SCHEMAS_PATH="$HERE/usr/schemas"
+          export PGMODELER_CONF_PATH="$HERE/usr/conf"
+          export PGMODELER_TMPL_CONF_PATH="$HERE/usr/conf"
+          export PGMODELER_LANG_PATH="$HERE/usr/lang"
+          export PGMODELER_PLUGINS_PATH="$HERE/usr/lib/pgmodeler/plugins"
+          export PGMODELER_SAMPLES_PATH="$HERE/usr/samples"
+          export PGMODELER_CH_PATH="$HERE/usr/bin/pgmodeler-ch"
+          export PGMODELER_CLI_PATH="$HERE/usr/bin/pgmodeler-cli"
+          export PGMODELER_SE_PATH="$HERE/usr/bin/pgmodeler-se"
+          export PGMODELER_TMP_PATH="${XDG_RUNTIME_DIR:-/tmp}/pgmodeler-tmp"
+          mkdir -p "$PGMODELER_TMP_PATH"
+          exec "$HERE/usr/bin/pgmodeler" "$@"
+          EOF
+          chmod +x AppDir/AppRun
+
       - name: Package AppImage
         run: |
           wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
