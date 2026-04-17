@@ -1,3 +1,22 @@
+> **Note:** This is a fork of [pgmodeler/pgmodeler](https://github.com/pgmodeler/pgmodeler) maintained solely to provide **free, pre-compiled builds** for all platforms. No source changes are made to pgModeler itself — only CI/CD workflows are added. If you want to contribute to the project or purchase official binaries with support, please visit the [upstream repository](https://github.com/pgmodeler/pgmodeler) or [pgmodeler.io](https://pgmodeler.io).
+
+## Download pre-built binaries
+
+Pre-compiled releases for Linux, macOS, and Windows are available on the [Releases page](https://github.com/noajoliver/pgmodeler/releases) — no login required.
+
+| Platform | Format |
+|----------|--------|
+| Linux | AppImage (self-contained, no install needed) |
+| macOS | DMG |
+| Windows | NSIS installer |
+| Windows | Portable ZIP (no install needed) |
+
+Two release tracks are maintained:
+- **v2.x (alpha)** — latest upstream development branch
+- **Stable (v1.2.3)** — last stable upstream release
+
+---
+
 ![pgmodeler_mainwindow](https://github.com/user-attachments/assets/0022f022-8412-491c-9155-8b84abf837ef)
 
 [![Linux build](https://github.com/pgmodeler/pgmodeler/workflows/Linux%20build/badge.svg)](https://github.com/pgmodeler/pgmodeler/actions?query=workflow%3A%22Linux+build%22)
