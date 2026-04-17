@@ -209,6 +209,20 @@ jobs:
         shell: bash
         run: echo "VERSION=$(grep -m1 'VERSION' pgmodeler.pro | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)" >> $GITHUB_OUTPUT
 
+      - name: Create portable ZIP
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.VERSION }}"
+          $installDir = "D:\a\pgmodeler\pgmodeler\install"
+          Compress-Archive -Path "$installDir\*" -DestinationPath "pgmodeler-$version-windows-x86_64-portable.zip"
+
+      - name: Upload portable ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: pgmodeler-stable-windows-portable
+          path: pgmodeler-*-windows-x86_64-portable.zip
+          retention-days: 30
+
       - name: Install NSIS
         shell: pwsh
         run: choco install nsis -y --no-progress
@@ -275,4 +289,4 @@ jobs:
           echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Linux (AppImage) | ${{ needs.build-linux.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| macOS (DMG) | ${{ needs.build-macos.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Windows (NSIS) | ${{ needs.build-windows.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Windows (NSIS + Portable ZIP) | ${{ needs.build-windows.result }} |" >> $GITHUB_STEP_SUMMARY
