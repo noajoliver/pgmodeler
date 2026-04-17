@@ -12,6 +12,9 @@ on:
           - '6.8.0'
           - '6.7.3'
           - '6.6.3'
+  push:
+    tags:
+      - 'v*'
 
 jobs:
   # ─── Linux → AppImage ────────────────────────────────────────────────────────
@@ -31,7 +34,7 @@ jobs:
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
-          version: ${{ inputs.qt_version }}
+          version: ${{ inputs.qt_version || '6.8.0' }}
 
       - name: Configure
         run: |
@@ -153,7 +156,7 @@ jobs:
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
-          version: ${{ inputs.qt_version }}
+          version: ${{ inputs.qt_version || '6.8.0' }}
 
       - name: Configure
         run: |
@@ -333,3 +336,24 @@ jobs:
           echo "| Linux (AppImage) | ${{ needs.build-linux.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| macOS (DMG) | ${{ needs.build-macos.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Windows (NSIS + Portable ZIP) | ${{ needs.build-windows.result }} |" >> $GITHUB_STEP_SUMMARY
+
+  # ─── GitHub Release (tag pushes only) ────────────────────────────────────────
+  publish-release:
+    name: Publish GitHub Release
+    needs: [build-linux, build-macos, build-windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
